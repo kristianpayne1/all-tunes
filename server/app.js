@@ -38,13 +38,16 @@ wss.on('connection', (ws, req) => {
                 // respond to host with party code
                 const response = {
                     messageType: 'CREATE_PARTY_SUCCESS',
-                    partycode: ws.partyCode
+                    partyCode: ws.partyCode
                 };
                 ws.send(JSON.stringify(response));
             }
+            break;
             case 'JOIN_PARTY_REQUEST': {
-                if (parties.has(ws.partyCode)) {
-                    if (isClientInParty(ws.partyCode, ws.ip)) {
+                if (parties.has(data.partyCode)) {
+                    if (isClientInParty(data.partyCode, ws.ip)) {
+                        ws.partyCode = data.partyCode;
+
                         console.log("Client: " + ws.ip + " joined party: " + ws.partyCode);
 
                         // add client to party
@@ -54,14 +57,13 @@ wss.on('connection', (ws, req) => {
                         parties.set(ws.partyCode, ws.ip);
                         const response = {
                             messageType: 'JOINED_PARTY',
-                            partycode: ws.partyCode,
+                            partyCode: ws.partyCode,
                         };
                         ws.send(JSON.stringify(response));
                     } else {
                         const response = {
                             messageType: 'JOIN_PARTY_ERROR',
-                            error: 'Client already in party',
-                            partyCode: ws.partyCode
+                            error: 'Client already in party'
                         }
                         ws.send(JSON.stringify(response));
                     }
@@ -69,15 +71,16 @@ wss.on('connection', (ws, req) => {
                     // tried joining unknown party
                     const response = {
                         messageType: 'JOIN_PARTY_ERROR',
-                        error: 'No party found',
-                        partyCode: ws.partyCode
+                        error: 'No party found'
                     };
                     ws.send(JSON.stringify(response));
                 }
             }
+            break;
             case 'DISCONNECTED': {
                 leaveParty(ws);
             }
+            break;
         }
     });
 });

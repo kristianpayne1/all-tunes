@@ -1,10 +1,10 @@
 import React from 'react';
 import './App.css';
-import PartyForm from './PartyForm';
+import Party from './Party';
 
 function App() {
   return (
-    <PartyForm />
+    <Party />
   );
 }
 

@@ -2,34 +2,57 @@ import React, { Component } from 'react';
 import { Button, Form, Col, Row } from 'react-bootstrap/';
 
 class PartyForm extends Component {
-
     state = {
-        socket: null,
-        partyCode: ''
+        value: ''
     }
 
-    componentDidMount(){
-        let socket = new WebSocket('ws://localhost:8524');
-        this.setState({socket : socket})
+    onHostButtonClicked = () => {
+        this.sendHostPartyMessage();
     }
 
     sendHostPartyMessage = () => {
-        var joinedMsg = {
+        var message = {
             messageType: 'CREATE_PARTY'
         };
-        this.state.socket.send(JSON.stringify(joinedMsg));
+        try {
+            this.props.socket.send(JSON.stringify(message));
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    onJoinButtonClicked = (event) => {
+        event.preventDefault();
+        console.log("Join button clicked");
+        this.sendJoinPartyMessage();
+    }
+
+    sendJoinPartyMessage = () => {
+        var message = {
+            messageType: 'JOIN_PARTY_REQUEST',
+            partyCode: this.state.value
+        };
+        try {
+            this.props.socket.send(JSON.stringify(message));
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    handleChange = (event) => {
+        this.setState({ value: event.target.value });
     }
 
     render() {
         return (
             <div>
-                <Form>
+                <Form onSubmit={this.onJoinButtonClicked}>
                     <Form.Group as={Row} controlId="">
                         <Form.Label column sm="2">
                             Host a party
                         </Form.Label>
                         <Col sm="10">
-                            <Button onClick={this.sendHostPartyMessage}>Host party</Button>
+                            <Button onClick={this.onHostButtonClicked}>Host party</Button>
                         </Col>
                     </Form.Group>
 
@@ -42,8 +65,10 @@ class PartyForm extends Component {
                                 type="text"
                                 placeholder="Party code"
                                 maxLength="6"
-                                style={{'textTransform':'uppercase'}}
+                                style={{ 'textTransform': 'uppercase' }}
                                 required
+                                value={this.state.value} 
+                                onChange={this.handleChange}
                             />
                             <Form.Control.Feedback type="invalid">
                                 Please enter party code.
