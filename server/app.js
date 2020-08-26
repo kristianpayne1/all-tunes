@@ -8,9 +8,11 @@ var crypto = require('crypto');
 
 var SpotifyWebApi = require('spotify-web-api-node');
 
-var client_id = ''; // Your client id
-var client_secret = ''; // Your secret
-var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
+// SPOTIFY WEB API
+
+var client_id = '4553b87393ad47fcb7e22bda6e2c8b4d';
+var client_secret = '9705be4d156346139ab83e4c8fd0c9ae';
+var redirect_uri = 'http://localhost:8888/callback';
 
 /**
  * Generates a random string containing numbers and letters
@@ -177,7 +179,7 @@ app.ws('/', function (ws, req) {
                 console.log("Party created with party code: " + ws.partyCode);
 
                 // create party 
-                parties.set(ws.partyCode, []);
+                parties.set(ws.partyCode, [ws]);
                 partyHost.set(ws.partyCode, ws);
 
                 // respond to host with party code
@@ -187,7 +189,7 @@ app.ws('/', function (ws, req) {
                 };
                 ws.send(JSON.stringify(response));
 
-                // get clients top users
+                // get client's top users
                 getTopArtists(ws);
             }
                 break;
@@ -203,15 +205,15 @@ app.ws('/', function (ws, req) {
                         ws.inParty = true;
                         let clients = parties.get(ws.partyCode);
                         clients.push(ws);
-                        parties.set(ws.partyCode, ws.ip);
+                        parties.set(ws.partyCode, clients);
                         const response = {
                             messageType: 'JOINED_PARTY',
                             partyCode: ws.partyCode,
                         };
                         ws.send(JSON.stringify(response));
 
-                        // get clients top users
-                        getTopArtists();
+                        // get client's top users
+                        getTopArtists(ws);
                     } else {
                         const response = {
                             messageType: 'JOIN_PARTY_ERROR',
@@ -237,15 +239,105 @@ app.ws('/', function (ws, req) {
     });
 });
 
+function updateParty(partyCode) {
+    let clients = parties.get(partyCode);
+
+    let topGenres = getTopGenres(clients);
+    let genreArtistMap = getGenreTopArtists(clients, topGenres);
+}
+
+function getGenreTopArtists(clients, genres) {
+    //TODO : This algorithm will need tweaking
+
+
+    let genreArtistMap = new Map();
+
+    // for each genre
+    genres.forEach((genre) => {
+        console.log('\n'+genre);
+        // get most in common artist
+        let artistMap = new Map();
+        // for each client
+        clients.forEach((client) => {
+            // for each clients top artist
+            client.topArtists.forEach((artist) => {
+                // if artist falls under genre
+                if (artist.genres.includes(genre)) {
+                    if (artistMap.has(artist)) {
+                        artistMap.set(artist, artistMap.get(artist) + 1);
+                    } else {
+                        artistMap.set(artist, 1);
+                    }
+                }
+            });
+        });
+
+        let topGenreArtists = [];
+        for (let i = 0; i < 4; i++) {
+            let currentTopArtist = '';
+            let currentTopArtistPoint = 0;
+            artistMap.forEach((value, key) => {
+                if (value > currentTopArtistPoint) {
+                    currentTopArtistPoint = value;
+                    currentTopArtist = key;
+                } else if (value === currentTopArtistPoint) {
+                    if (currentTopArtist.popularity < key.popularity) {
+                        currentTopArtistPoint = value;
+                        currentTopArtist = key;
+                    }
+                }
+            });
+            console.log(currentTopArtist.name + ' = ' + currentTopArtistPoint)
+            topGenreArtists.push(currentTopArtist);
+            artistMap.delete(currentTopArtist);
+        }
+
+        genreArtistMap.set(genre, topGenreArtists);
+    });
+    return genreArtistMap;
+}
+
+function getTopGenres(clients) {
+    let genres = new Map();
+    clients.forEach((client) => {
+        client.topArtists.forEach((artist) => {
+            artist.genres.forEach((genre) => {
+                if (genres.has(genre)) {
+                    genres.set(genre, genres.get(genre) + 1);
+                } else {
+                    genres.set(genre, 1);
+                }
+            })
+        });
+    });
+
+    let topGenres = [];
+    for (let i = 0; i < 5; i++) {
+        let currentTopGenrePoint = 0;
+        let currentTopGenre = '';
+        genres.forEach((value, key) => {
+            if (value > currentTopGenrePoint) {
+                currentTopGenrePoint = value;
+                currentTopGenre = key;
+            }
+        });
+        topGenres.push(currentTopGenre);
+        genres.delete(currentTopGenre);
+    }
+
+    return topGenres;
+}
+
 function getTopArtists(client) {
-    client.spotifyWebApi.getMyTopArtists({ time_range: 'long_term', limit: 50 })
+    client.spotifyWebApi.getMyTopArtists({ time_range: 'medium_term', limit: 50 })
         .then(
             function (data) {
                 let topArtists = [];
-                data.items.forEach(artist => {
+                data.body.items.forEach(artist => {
                     topArtists.push(artist);
                 });
                 client.topArtists = topArtists;
+                updateParty(client.partyCode)
             },
             function (err) {
                 console.error(err);
