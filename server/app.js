@@ -8,11 +8,9 @@ var crypto = require('crypto');
 
 var SpotifyWebApi = require('spotify-web-api-node');
 
-// SPOTIFY WEB API
-
-var client_id = '4553b87393ad47fcb7e22bda6e2c8b4d';
-var client_secret = '9705be4d156346139ab83e4c8fd0c9ae';
-var redirect_uri = 'http://localhost:8888/callback';
+var client_id = ''; // Your client id
+var client_secret = ''; // Your secret
+var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
 
 /**
  * Generates a random string containing numbers and letters
