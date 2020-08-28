@@ -16,6 +16,7 @@ class Home extends Component {
             isHost: false,
             partyCode: '',
             isConnected: false,
+            recommended: [],
         }
     }
 
@@ -46,22 +47,27 @@ class Home extends Component {
                             console.log(error);
                         }
                     }
-                    break;
+                        break;
                     case 'CREATE_PARTY_SUCCESS': {
                         let partyCode = message.partyCode;
                         console.log('Hosting party: ' + partyCode);
-                        self.setState({ partyCode: partyCode, isHost: true, isConnected: true});
+                        self.setState({ partyCode: partyCode, isHost: true, isConnected: true });
                     }
                         break;
                     case 'JOINED_PARTY': {
                         let partyCode = message.partyCode;
                         console.log('Joined party: ' + partyCode);
-                        self.setState({ partyCode: partyCode, isConnected: true});
+                        self.setState({ partyCode: partyCode, isConnected: true });
                     }
                         break;
                     case 'JOIN_PARTY_ERROR': {
-                        self.setState({isConnected: false, partyCode: '', isHost: false});
+                        self.setState({ isConnected: false, partyCode: '', isHost: false });
                         console.log("Failed to join party \n" + message.error)
+                    }
+                        break;
+                    case 'UPDATE_RECOMMENDED': {
+                        console.table(message.data);
+                        self.setState({recommended: message.data});
                     }
                         break;
                     default: {
@@ -75,12 +81,12 @@ class Home extends Component {
                         err.message,
                         "Closing socket"
                     );
-                    self.setState({isConnected: false, partyCode: '', isHost: false});
+                    self.setState({ isConnected: false, partyCode: '', isHost: false, recommended: [] });
                     socket.close();
                 }
 
                 socket.onclose = () => {
-                    self.setState({isConnected: false, partyCode: '', isHost: false});
+                    self.setState({ isConnected: false, partyCode: '', isHost: false, recommended: [] });
                     console.log('disconnected')
                     // automatically try to reconnect on connection loss
                 }
@@ -102,8 +108,13 @@ class Home extends Component {
 
     render() {
         let redirect = !this.state.loggedIn ? <Redirect to="/" /> : null;
-        let partyView = this.state.isConnected ? 
-            <PartyView isHost={this.state.isHost} partyCode={this.state.partyCode}/> : 
+        let partyView = this.state.isConnected ?
+            <PartyView 
+                isHost={this.state.isHost} 
+                partyCode={this.state.partyCode} 
+                recommended={this.state.recommended}
+                socket={this.state.socket}
+            /> :
             <PartyForm socket={this.state.socket} />
         return (
             <div>

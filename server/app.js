@@ -44,7 +44,7 @@ app.get('/login', function (req, res) {
     res.cookie(stateKey, state);
 
     // your application requests authorization
-    var scope = 'user-top-read user-read-recently-played user-library-read';
+    var scope = 'user-top-read user-read-recently-played user-library-read user-modify-playback-state';
     res.redirect('https://accounts.spotify.com/authorize?' +
         querystring.stringify({
             response_type: 'code',
@@ -154,6 +154,7 @@ app.ws('/', function (ws, req) {
     ws.inParty = false;
     ws.partyCode = '';
     ws.spotifyWebApi = new SpotifyWebApi();
+    ws.access_token = '';
     ws.topArtists = [];
 
     // ask client for the spotify access_token
@@ -169,6 +170,7 @@ app.ws('/', function (ws, req) {
             case 'ACCESS_TOKEN': {
                 if (data.access_token) {
                     ws.spotifyWebApi.setAccessToken(data.access_token);
+                    ws.access_token = data.access_token;
                 }
             }
                 break;
@@ -194,7 +196,6 @@ app.ws('/', function (ws, req) {
             }
                 break;
             case 'JOIN_PARTY_REQUEST': {
-                console.log(data.partyCode);
                 if (parties.has(data.partyCode)) {
                     if (isClientInParty(data.partyCode, ws.ip)) {
                         ws.partyCode = data.partyCode;
@@ -231,6 +232,11 @@ app.ws('/', function (ws, req) {
                 }
             }
                 break;
+            case 'QUEUE_SONG' : {
+                console.log('Queueing song')
+                console.log(data.uri);
+            }
+            break;
             case 'DISCONNECTED': {
                 leaveParty(ws);
             }
@@ -240,61 +246,14 @@ app.ws('/', function (ws, req) {
 });
 
 function updateParty(partyCode) {
+    //TODO: OPTIMISE THIS!!
+
     let clients = parties.get(partyCode);
+    let host = partyHost.get(partyCode);
 
     let topGenres = getTopGenres(clients);
     let genreArtistMap = getGenreTopArtists(clients, topGenres);
-}
-
-function getGenreTopArtists(clients, genres) {
-    //TODO : This algorithm will need tweaking
-
-
-    let genreArtistMap = new Map();
-
-    // for each genre
-    genres.forEach((genre) => {
-        console.log('\n'+genre);
-        // get most in common artist
-        let artistMap = new Map();
-        // for each client
-        clients.forEach((client) => {
-            // for each clients top artist
-            client.topArtists.forEach((artist) => {
-                // if artist falls under genre
-                if (artist.genres.includes(genre)) {
-                    if (artistMap.has(artist)) {
-                        artistMap.set(artist, artistMap.get(artist) + 1);
-                    } else {
-                        artistMap.set(artist, 1);
-                    }
-                }
-            });
-        });
-
-        let topGenreArtists = [];
-        for (let i = 0; i < 4; i++) {
-            let currentTopArtist = '';
-            let currentTopArtistPoint = 0;
-            artistMap.forEach((value, key) => {
-                if (value > currentTopArtistPoint) {
-                    currentTopArtistPoint = value;
-                    currentTopArtist = key;
-                } else if (value === currentTopArtistPoint) {
-                    if (currentTopArtist.popularity < key.popularity) {
-                        currentTopArtistPoint = value;
-                        currentTopArtist = key;
-                    }
-                }
-            });
-            console.log(currentTopArtist.name + ' = ' + currentTopArtistPoint)
-            topGenreArtists.push(currentTopArtist);
-            artistMap.delete(currentTopArtist);
-        }
-
-        genreArtistMap.set(genre, topGenreArtists);
-    });
-    return genreArtistMap;
+    loadRecommendedSongs(host, genreArtistMap, topGenres);
 }
 
 function getTopGenres(clients) {
@@ -328,6 +287,57 @@ function getTopGenres(clients) {
     return topGenres;
 }
 
+function getGenreTopArtists(clients, genres) {
+    //TODO : This algorithm will need tweaking
+
+
+    let genreArtistMap = new Map();
+
+    // for each genre
+    genres.forEach((genre) => {
+        // console.log('\n' + genre);
+        // get most in common artist
+        let artistMap = new Map();
+        // for each client
+        clients.forEach((client) => {
+            // for each clients top artist
+            client.topArtists.forEach((artist) => {
+                // if artist falls under genre
+                if (artist.genres.includes(genre)) {
+                    if (artistMap.has(artist)) {
+                        artistMap.set(artist, artistMap.get(artist) + 1);
+                    } else {
+                        artistMap.set(artist, 1);
+                    }
+                }
+            });
+        });
+
+        let topGenreArtists = [];
+        for (let i = 0; i < 4; i++) {
+            let currentTopArtist = '';
+            let currentTopArtistPoint = 0;
+            artistMap.forEach((value, key) => {
+                if (value > currentTopArtistPoint) {
+                    currentTopArtistPoint = value;
+                    currentTopArtist = key;
+                } else if (value === currentTopArtistPoint) {
+                    if (currentTopArtist.popularity < key.popularity) {
+                        currentTopArtistPoint = value;
+                        currentTopArtist = key;
+                    }
+                }
+            });
+            //console.log(currentTopArtist.name + ' = ' + currentTopArtistPoint)
+            topGenreArtists.push(currentTopArtist);
+            artistMap.delete(currentTopArtist);
+        }
+
+        genreArtistMap.set(genre, topGenreArtists);
+    });
+    return genreArtistMap;
+}
+
 function getTopArtists(client) {
     client.spotifyWebApi.getMyTopArtists({ time_range: 'medium_term', limit: 50 })
         .then(
@@ -343,6 +353,69 @@ function getTopArtists(client) {
                 console.error(err);
             }
         );
+}
+
+function loadRecommendedSongs(host, genreArtistMap, topGenres) {
+    let songArray = [];
+
+    genreArtistMap.forEach((value, key) => {
+        let seed_artists = '';
+        value.forEach((artist) => {
+            seed_artists += artist.id + ','
+        });
+
+        songArray.push(getRecommendedSongs(key, seed_artists, host.spotifyWebApi));
+
+    });
+    Promise.all(songArray).then((songs) => {
+        let genreSong = [];
+        for (let i = 0; i < topGenres.length; i++) {
+            genreSong.push({genre: topGenres[i], songs : songs[i]});
+        }
+        sendUpdatedRecommended(genreSong, host);
+    })
+}
+
+function getRecommendedSongs(genre, seed_artists, spotifyWebApi) {
+    // TODO: This needs tweaking too
+    return new Promise((resolve, reject) => {
+        spotifyWebApi.getRecommendations({ seed_genre: genre.id, seed_artists: seed_artists, min_danceability: 0.75, min_energy: 0.75, min_popularity: 60, min_tempo: 80 })
+            .then(
+                function (response) {
+                    let recommendedSongs = [];
+                    response.body.tracks.forEach((song) => {
+                        recommendedSongs.push(song);
+                    })
+                    let sortedSongs = sortRecommendedSongs(recommendedSongs);
+                    resolve(sortedSongs);
+                },
+                function (err) {
+                    console.error(err);
+                })
+    })
+}
+
+function sortRecommendedSongs(songs) {
+    let n = songs.length;
+    for (let i = 1; i < n; ++i) {
+        let key = songs[i];
+        let j = i - 1;
+
+        while (j >= 0 && songs[j].popularity < key.popularity) {
+            songs[j + 1] = songs[j];
+            j = j - 1;
+        }
+        songs[j + 1] = key;
+    }
+    return songs;
+}
+
+function sendUpdatedRecommended(genreSong, host) {
+    const message = {
+        messageType: 'UPDATE_RECOMMENDED',
+        data: genreSong,
+    };
+    host.send(JSON.stringify(message));
 }
 
 function isClientInParty(party, ip) {
