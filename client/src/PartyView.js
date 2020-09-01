@@ -1,22 +1,8 @@
 import React, { Component } from 'react';
 import { Tabs, Tab, Table, Spinner } from 'react-bootstrap';
+import QueueButton from './QueueButton.js';
 
 class PartyView extends Component {
-    onQueueButtonClicked = (song) => {
-        this.sendQueueSong(song);
-    }
-
-    sendQueueSong = (song) => {
-        var message = {
-            messageType: 'QUEUE_SONG',
-            uri: song.uri,
-        };
-        try {
-            this.props.socket.send(JSON.stringify(message));
-        } catch (error) {
-            console.log(error);
-        }
-    }
 
     renderTable = (songs) => {
         return songs.map(song => {
@@ -29,6 +15,7 @@ class PartyView extends Component {
                     <td>{song.name}</td>
                     <td>{artists}</td>
                     <td>{song.popularity}</td>
+                    <td><QueueButton song={song} socket={this.props.socket}/></td>
                 </tr>
             )
         })
@@ -44,6 +31,7 @@ class PartyView extends Component {
                                 <th>Song</th>
                                 <th>Artist(s)</th>
                                 <th>Popularity</th>
+                                <th>Queue</th>
                             </tr>
                         </thead>
                         <tbody>

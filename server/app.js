@@ -102,7 +102,7 @@ app.get('/callback', function (req, res) {
                 });
 
                 // we can also pass the token to the browser to make requests from there
-                res.redirect('http://localhost:3000/home/#' +
+                res.redirect('http://localhost:3000/#/home/$' +
                     querystring.stringify({
                         access_token: access_token,
                         refresh_token: refresh_token
@@ -233,8 +233,26 @@ app.ws('/', function (ws, req) {
             }
                 break;
             case 'QUEUE_SONG' : {
-                console.log('Queueing song')
-                console.log(data.uri);
+                console.log('Queue song: '+data.uri);
+
+                var queueOptions = {
+                    url: 'https://api.spotify.com/v1/me/player/queue',
+                    qs: {
+                        uri: data.uri
+                    },
+                    headers: {
+                        'Authorization': 'Bearer ' + ws.access_token
+                    },
+                    json: true
+                };
+
+                request.post(queueOptions, function (error, response, body) {
+                    if (!error && response.statusCode === 204) {
+                        console.log('Song queued');
+                    }else{
+                        console.log('Failed to queue song. Error code: ' + response.statusCode);
+                    }
+                });
             }
             break;
             case 'DISCONNECTED': {

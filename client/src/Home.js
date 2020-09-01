@@ -7,7 +7,7 @@ import PartyView from './PartyView.js';
 class Home extends Component {
     constructor() {
         super();
-        const params = this.getHashParams();
+        const params = this.getDollarParams();
         const token = params.access_token;
         this.state = {
             loggedIn: token ? true : false,
@@ -67,7 +67,7 @@ class Home extends Component {
                         break;
                     case 'UPDATE_RECOMMENDED': {
                         console.table(message.data);
-                        self.setState({recommended: message.data});
+                        self.setState({ recommended: message.data });
                     }
                         break;
                     default: {
@@ -94,24 +94,25 @@ class Home extends Component {
         }
     }
 
-    getHashParams = () => {
-        var hashParams = {};
+    getDollarParams = () => {
+        var dollarParams = {};
         var e, r = /([^&;=]+)=?([^&;]*)/g,
-            q = window.location.hash.substring(1);
-        e = r.exec(q)
+            q = window.location.href;
+        var w = q.split('$')[1];
+        e = r.exec(w);
         while (e) {
-            hashParams[e[1]] = decodeURIComponent(e[2]);
-            e = r.exec(q);
+            dollarParams[e[1]] = decodeURIComponent(e[2]);
+            e = r.exec(w);
         }
-        return hashParams;
+        return dollarParams;
     }
 
     render() {
         let redirect = !this.state.loggedIn ? <Redirect to="/" /> : null;
         let partyView = this.state.isConnected ?
-            <PartyView 
-                isHost={this.state.isHost} 
-                partyCode={this.state.partyCode} 
+            <PartyView
+                isHost={this.state.isHost}
+                partyCode={this.state.partyCode}
                 recommended={this.state.recommended}
                 socket={this.state.socket}
             /> :

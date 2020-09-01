@@ -1,8 +1,7 @@
 import React from 'react';
 import './App.css';
 import {
-  BrowserRouter as Router,
-  Switch,
+  HashRouter as Router,
   Route
 } from "react-router-dom";
 import Welcome from './Welcome';
@@ -10,15 +9,13 @@ import Home from './Home.js';
 
 function App() {
   return (
-    <Router>
-      <Switch>
+    <Router basename='/'>
         <Route path="/home">
           <Home />
         </Route>
-        <Route path='/'>
+        <Route exact path='/'>
           <Welcome />
         </Route>
-      </Switch>
     </Router>
   );
 }
